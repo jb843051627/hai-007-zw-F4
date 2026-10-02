@@ -84,9 +84,82 @@ public class TZwImpRow implements Serializable {
     @ApiModelProperty(value = "所依标准的生效那天")
     private Date ruleEffDate;
 
-    /** 行落地情形 0待核 1已入库 2退回 */
+    /** Excel 里申报的规则代号（库里钉死的线代号与之对不上即整批拦截） */
+    @TableField("declared_rule_code")
+    @ApiModelProperty(value = "申报规则代号")
+    private String declaredRuleCode;
+
+    /** 原始行原文（按原列序逐格拼接，下钻与归档都只看这条原样） */
+    @TableField("raw_line")
+    @ApiModelProperty(value = "原始行原文")
+    private String rawLine;
+
+    /** 是否有效（Excel 随单申报）1有效 0无效 */
+    @TableField("valid_flag")
+    @ApiModelProperty(value = "是否有效 1有效 0无效")
+    private Integer validFlag;
+
+    /** 是否已复核（Excel 随单申报）1已复核 0未复核 */
+    @TableField("reviewed_flag")
+    @ApiModelProperty(value = "是否已复核 1已复核 0未复核")
+    private Integer reviewedFlag;
+
+    /** 校验结论 0待校 1格式合格 2异常 */
+    @TableField("check_status")
+    @ApiModelProperty(value = "校验结论 0待校 1格式合格 2异常")
+    private Integer checkStatus;
+
+    /** 校验说明（每条都说清楚能不能过、为什么） */
+    @TableField("check_msg")
+    @ApiModelProperty(value = "校验说明")
+    private String checkMsg;
+
+    /** 异常确认人 */
+    @TableField("confirm_by")
+    @ApiModelProperty(value = "异常确认人")
+    private String confirmBy;
+
+    /** 异常确认时刻 */
+    @TableField("confirm_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "异常确认时刻")
+    private Date confirmTime;
+
+    /** 核实结论 1核实成 2核实不成（随批次那一次回写） */
+    @TableField("verify_result")
+    @ApiModelProperty(value = "核实结论 1核实成 2核实不成")
+    private Integer verifyResult;
+
+    /** 核实不成原因（随批次回写） */
+    @TableField("verify_reason")
+    @ApiModelProperty(value = "核实不成原因")
+    private String verifyReason;
+
+    /** 核实人（随批次回写，以那次为准） */
+    @TableField("verify_by")
+    @ApiModelProperty(value = "核实人")
+    private String verifyBy;
+
+    /** 核实时间（随批次回写） */
+    @TableField("verify_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "核实时间")
+    private Date verifyTime;
+
+    /** 归档标识 0未归档 1已归档只读 */
+    @TableField("archived")
+    @ApiModelProperty(value = "归档标识 0未归档 1已归档只读")
+    private Integer archived;
+
+    /** 归档时刻 */
+    @TableField("archive_time")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @ApiModelProperty(value = "归档时刻")
+    private Date archiveTime;
+
+    /** 行落地情形 0未入正式账(整批拦在库外) 1已入库 */
     @TableField("status")
-    @ApiModelProperty(value = "行落地情形 0待核 1已入库 2退回")
+    @ApiModelProperty(value = "行落地情形 0未入正式账 1已入库")
     private Integer status;
 
     /** 删除标记 0正常 1删除 */
@@ -207,6 +280,118 @@ public class TZwImpRow implements Serializable {
 
     public void setRuleEffDate(Date ruleEffDate) {
         this.ruleEffDate = ruleEffDate;
+    }
+
+    public String getDeclaredRuleCode() {
+        return declaredRuleCode;
+    }
+
+    public void setDeclaredRuleCode(String declaredRuleCode) {
+        this.declaredRuleCode = declaredRuleCode;
+    }
+
+    public String getRawLine() {
+        return rawLine;
+    }
+
+    public void setRawLine(String rawLine) {
+        this.rawLine = rawLine;
+    }
+
+    public Integer getValidFlag() {
+        return validFlag;
+    }
+
+    public void setValidFlag(Integer validFlag) {
+        this.validFlag = validFlag;
+    }
+
+    public Integer getReviewedFlag() {
+        return reviewedFlag;
+    }
+
+    public void setReviewedFlag(Integer reviewedFlag) {
+        this.reviewedFlag = reviewedFlag;
+    }
+
+    public Integer getCheckStatus() {
+        return checkStatus;
+    }
+
+    public void setCheckStatus(Integer checkStatus) {
+        this.checkStatus = checkStatus;
+    }
+
+    public String getCheckMsg() {
+        return checkMsg;
+    }
+
+    public void setCheckMsg(String checkMsg) {
+        this.checkMsg = checkMsg;
+    }
+
+    public String getConfirmBy() {
+        return confirmBy;
+    }
+
+    public void setConfirmBy(String confirmBy) {
+        this.confirmBy = confirmBy;
+    }
+
+    public Date getConfirmTime() {
+        return confirmTime;
+    }
+
+    public void setConfirmTime(Date confirmTime) {
+        this.confirmTime = confirmTime;
+    }
+
+    public Integer getVerifyResult() {
+        return verifyResult;
+    }
+
+    public void setVerifyResult(Integer verifyResult) {
+        this.verifyResult = verifyResult;
+    }
+
+    public String getVerifyReason() {
+        return verifyReason;
+    }
+
+    public void setVerifyReason(String verifyReason) {
+        this.verifyReason = verifyReason;
+    }
+
+    public String getVerifyBy() {
+        return verifyBy;
+    }
+
+    public void setVerifyBy(String verifyBy) {
+        this.verifyBy = verifyBy;
+    }
+
+    public Date getVerifyTime() {
+        return verifyTime;
+    }
+
+    public void setVerifyTime(Date verifyTime) {
+        this.verifyTime = verifyTime;
+    }
+
+    public Integer getArchived() {
+        return archived;
+    }
+
+    public void setArchived(Integer archived) {
+        this.archived = archived;
+    }
+
+    public Date getArchiveTime() {
+        return archiveTime;
+    }
+
+    public void setArchiveTime(Date archiveTime) {
+        this.archiveTime = archiveTime;
     }
 
     public Integer getStatus() {

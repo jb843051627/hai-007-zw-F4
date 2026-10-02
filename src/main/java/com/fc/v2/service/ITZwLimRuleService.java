@@ -41,6 +41,13 @@ public interface ITZwLimRuleService {
     WaterVerdict evaluate(String ruleCode, BigDecimal input, Date at, boolean forReview);
 
     /**
+     * 凭代号调规则条文本身（下钻页把原始行、规则条文、复核结论并排看用）：
+     * 取 at 时刻该编号在窗口内的那条；{@code includeRetired=true} 时让位行也调得出。
+     * 查无返回 null。口径与 {@link #evaluate(String, BigDecimal, Date, boolean)} 的定位完全一致。
+     */
+    TZwLimRule ruleOf(String ruleCode, Date at, boolean includeRetired);
+
+    /**
      * 老方法维持原样：按 ruleCode 在 at 时刻现行生效的版本判档（1..4）。
      * 无生效版本 / 输入越界 / 参数缺失一律返回 0。
      */
