@@ -41,16 +41,20 @@ CREATE TABLE IF NOT EXISTS t_zw_case_flow (
 
 CREATE TABLE IF NOT EXISTS t_zw_imp_row (
   id bigint NOT NULL COMMENT '主键',
-  batch_no varchar(64) DEFAULT NULL COMMENT '检测数据上传批次号',
+  batch_no varchar(64) DEFAULT NULL COMMENT '检测数据上传批次号（采样批次）',
   row_no int DEFAULT NULL COMMENT '原表行次',
   site_no varchar(64) DEFAULT NULL COMMENT '采样点位代号（随样本入账，水质核实只认代号）',
   item_code varchar(64) DEFAULT NULL COMMENT '被校验出的数据项代号',
   qty decimal(12,2) DEFAULT NULL COMMENT '本行检测读数',
   sample_type varchar(32) DEFAULT NULL COMMENT '样本类别(水源水/出厂水/管网末梢)',
   test_at datetime DEFAULT NULL COMMENT '检测发生那天（用哪条线只看这天，不看今天）',
+  valid_flag int DEFAULT NULL COMMENT '申报是否有效 0否 1是（随原始行入账，筛选口径）',
+  review_flag int DEFAULT NULL COMMENT '申报是否已复核 0否 1是（随原始行入账，筛选口径）',
   grade_level int DEFAULT NULL COMMENT '评价等级 1合格 2关注 3超标 4严重超标；空=未定级(无可用标准)',
   rule_code varchar(64) DEFAULT NULL COMMENT '定级所依标准线代号（服务层回值钉死，写过不再改）',
   rule_eff_date datetime DEFAULT NULL COMMENT '所依标准的生效那天（历史复核只认此编号上下文）',
+  raw_line varchar(1000) DEFAULT NULL COMMENT '原始行原样留档（七列原样拼接，下钻先看这一条）',
+  imp_issue_msg varchar(500) DEFAULT NULL COMMENT '本行校验结论文面（异常细账在 t_zw_issue，明细为准）',
   status int DEFAULT NULL COMMENT '行落地情形 0待核 1已入库 2退回',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
@@ -58,8 +62,51 @@ CREATE TABLE IF NOT EXISTS t_zw_imp_row (
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='检测数据导入核对行';
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_imp_batch_row (batch_no, row_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='检测数据导入核对行（只收格式合格行）';
+
+-- 异常核实台账：异常的生成、确认、核实、归档全留在这里，只追加核实结论一次；
+-- 核实成/核实不成连同核实人、核实时刻当场钉死，归档后原样锁住，任何导入/动作不得再改。
+CREATE TABLE IF NOT EXISTS t_zw_issue (
+  id bigint NOT NULL COMMENT '主键',
+  issue_no varchar(64) DEFAULT NULL COMMENT '异常事项号（批次号-行次，一次生成）',
+  batch_no varchar(64) DEFAULT NULL COMMENT '来源上传批次号',
+  row_no int DEFAULT NULL COMMENT '原表行次',
+  site_no varchar(64) DEFAULT NULL COMMENT '采样点位代号（只认代号不认名字）',
+  item_code varchar(64) DEFAULT NULL COMMENT '被校验出的数据项代号',
+  qty decimal(12,2) DEFAULT NULL COMMENT '本行检测读数（照原始行抄入）',
+  sample_type varchar(32) DEFAULT NULL COMMENT '样本类别(水源水/出厂水/管网末梢)',
+  test_at datetime DEFAULT NULL COMMENT '检测时间（唯一解析口径，页面与接口同一把尺）',
+  valid_flag int DEFAULT NULL COMMENT '申报是否有效 0否 1是',
+  review_flag int DEFAULT NULL COMMENT '申报是否已复核 0否 1是',
+  rule_code_decl varchar(64) DEFAULT NULL COMMENT '申报规则代号（原始行里带的那条）',
+  rule_code_hit varchar(64) DEFAULT NULL COMMENT '裁决出口按检测当天选中的规则代号',
+  grade_level int DEFAULT NULL COMMENT '裁决出口给的等级；无可用标准/读数越界为空',
+  raw_line varchar(1000) DEFAULT NULL COMMENT '原始行原样留档（归档后锁住的就是这一条）',
+  check_result varchar(500) DEFAULT NULL COMMENT '校验结论：本行能不能过校验、为什么，逐行写明',
+  issue_type varchar(32) DEFAULT NULL COMMENT '异常类 INVALID读数越界/NO_RULE无可用标准/RULE_MISMATCH规则代号对不上',
+  confirm_status int DEFAULT '0' COMMENT '确认情形 0待确认 1已确认（异常先入册、再当面确认）',
+  confirm_by varchar(64) DEFAULT NULL COMMENT '确认人',
+  confirm_time datetime DEFAULT NULL COMMENT '确认时刻',
+  verify_result int DEFAULT NULL COMMENT '核实结论 1核实成 2核实不成；空=尚未核实',
+  verify_reason varchar(500) DEFAULT NULL COMMENT '核实不成的原因（核实不成必填，核实成留补充说明）',
+  verify_by varchar(64) DEFAULT NULL COMMENT '核实人（谁核实的写谁，以这一次为准）',
+  verify_time datetime DEFAULT NULL COMMENT '核实时刻（只写一次，系统日志可翻出哪一次写的）',
+  archived int DEFAULT '0' COMMENT '归档标识 0未归档 1已归档（归档即只读，原样锁住不能再改）',
+  status int DEFAULT '0' COMMENT '台账情形 0在办 1已封档',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除（归档行永不置删）',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_issue_no (issue_no),
+  UNIQUE KEY uk_issue_batch_row (batch_no, row_no),
+  KEY idx_issue_site (site_no),
+  KEY idx_issue_batch (batch_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='水质异常核实台账（一次核实、归档只读）';
 
 CREATE TABLE IF NOT EXISTS t_zw_lim_rule (
   id bigint NOT NULL COMMENT '主键',
@@ -226,14 +273,45 @@ VALUES (880001, 1, '水源枯竭停水公告', 'DEPLETED', 'zw_stop_notice', '',
         '因{site}设施检修，定于停水时段暂停供水，检修完成后即时恢复，请用户提前做好储水准备。');
 
 -- 城北水源地近三个月水源水余氯检测行：0.62/0.65/0.71，对现行线 CL-SW-2026 连续超标，供第二道核实对照。
-INSERT IGNORE INTO t_zw_imp_row (id, batch_no, row_no, site_no, item_code, qty, sample_type, test_at, grade_level, rule_code, rule_eff_date, status, del_flag, create_by, create_time)
-VALUES (9001, 'B202607', 1, 'ZS00', 'CL', 0.62, '水源水', '2026-07-18 09:00:00', 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW()),
-       (9002, 'B202608', 1, 'ZS00', 'CL', 0.65, '水源水', '2026-08-18 09:00:00', 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW()),
-       (9003, 'B202609', 1, 'ZS00', 'CL', 0.71, '水源水', '2026-09-18 09:00:00', 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW());
+INSERT IGNORE INTO t_zw_imp_row (id, batch_no, row_no, site_no, item_code, qty, sample_type, test_at, valid_flag, review_flag, grade_level, rule_code, rule_eff_date, status, del_flag, create_by, create_time)
+VALUES (9001, 'B202607', 1, 'ZS00', 'CL', 0.62, '水源水', '2026-07-18 09:00:00', 1, 1, 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW()),
+       (9002, 'B202608', 1, 'ZS00', 'CL', 0.65, '水源水', '2026-08-18 09:00:00', 1, 1, 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW()),
+       (9003, 'B202609', 1, 'ZS00', 'CL', 0.71, '水源水', '2026-09-18 09:00:00', 1, 1, 4, 'CL-SW-2026', '2026-01-01 00:00:00', 1, 0, 'seed', NOW());
 
 -- 未完结处置单演示：ZS02 名下挂着在办工单，该点的停供申请到第二道即被压住，不得往前。
 INSERT IGNORE INTO t_zw_source (id, site_no, site_name, site_type, road_name, th1_max, th2_max, th3_max, status, del_flag, create_by, create_time)
 VALUES (2, 'ZS02', '青坪市青西水源地（在用·有在办处置单）', '水源地', '青坪省—青坪市—城西区—青西街道', 30.00, 80.00, 200.00, 0, 0, 'seed', NOW());
 INSERT IGNORE INTO t_zw_case_flow (id, biz_no, site_no, stage, status, content, last_action, del_flag, create_by, create_time)
 VALUES (9101, 'CF-202609-01', 'ZS02', 1, 1, '余氯异常处置中', '初检', 0, 'seed', NOW());
+
+-- 既有库升级（旧库已建过 t_zw_imp_row 的，手动补这四列后再发版；全新库由上面的 CREATE TABLE 带出）：
+-- ALTER TABLE t_zw_imp_row
+--   ADD COLUMN valid_flag int DEFAULT NULL COMMENT '申报是否有效 0否 1是' AFTER test_at,
+--   ADD COLUMN review_flag int DEFAULT NULL COMMENT '申报是否已复核 0否 1是' AFTER valid_flag,
+--   ADD COLUMN raw_line varchar(1000) DEFAULT NULL COMMENT '原始行原样留档' AFTER rule_eff_date,
+--   ADD COLUMN imp_issue_msg varchar(500) DEFAULT NULL COMMENT '本行校验结论文面' AFTER raw_line,
+--   ADD UNIQUE KEY uk_imp_batch_row (batch_no, row_no);
+
+-- 菜单与按钮权限（t_sys_permission）：化验读数导入/明细、水质异常核实台账。
+-- 881000 为「水质检测」目录；按钮 perms 串与 Controller @RequiresPermissions 逐一对齐。
+INSERT IGNORE INTO t_sys_permission
+  (id, name, descripion, url, is_blank, pid, perms, type, icon, order_num, visible, create_by, create_time)
+VALUES
+  (881000, '水质检测', '水质检测调度目录', NULL, 0, 0, NULL, 0, 'layui-icon-water', 90, 0, 'seed', NOW()),
+  (881010, '化验读数导入与明细', 'Excel 整批导入与正式账查询', '/zwImpData/view', 0, 881000, 'zw:zwImpData:view', 1, 'layui-icon-upload-circle', 1, 0, 'seed', NOW()),
+  (881011, '检测明细查询', '正式账列表查询', '/zwImpData/list', 0, 881010, 'zw:zwImpData:list', 2, NULL, NULL, 0, 'seed', NOW()),
+  (881012, '化验读数导入', '整文件校验导入', '/zwImpData/upload', 0, 881010, 'zw:zwImpData:import', 2, NULL, NULL, 0, 'seed', NOW()),
+  (881013, '检测明细报表导出', 'UTF-8 Excel 导出', '/zwImpData/report', 0, 881010, 'zw:zwImpData:export', 2, NULL, NULL, 0, 'seed', NOW()),
+  (881020, '水质异常核实台账', '异常列表/下钻/确认/整批一次核实归档', '/zwIssue/view', 0, 881000, 'zw:zwIssue:view', 1, 'layui-icon-about', 2, 0, 'seed', NOW()),
+  (881021, '异常台账查询', '异常列表查询', '/zwIssue/list', 0, 881020, 'zw:zwIssue:list', 2, NULL, NULL, 0, 'seed', NOW()),
+  (881022, '异常当面确认', '逐条/整批确认', '/zwIssue/confirm', 0, 881020, 'zw:zwIssue:confirm', 2, NULL, NULL, 0, 'seed', NOW()),
+  (881023, '异常整批核实归档', '整批一次核实，归档只读', '/zwIssue/verify', 0, 881020, 'zw:zwIssue:verify', 2, NULL, NULL, 0, 'seed', NOW());
+
+-- 授给管理员角色（id=488243256161730560）；其他角色按岗位在权限管理里另授。
+INSERT IGNORE INTO t_sys_permission_role (id, role_id, permission_id, create_by, create_time)
+SELECT p.pid, 488243256161730560, p.pid, 'seed', NOW()
+FROM (
+  SELECT 881010 AS pid UNION ALL SELECT 881011 UNION ALL SELECT 881012 UNION ALL SELECT 881013
+  UNION ALL SELECT 881020 UNION ALL SELECT 881021 UNION ALL SELECT 881022 UNION ALL SELECT 881023
+) p;
 

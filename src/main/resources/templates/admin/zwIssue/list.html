@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('水质异常核实台账')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">采样批次</label>
+                <div class="layui-input-inline">
+                    <select name="batchNo" lay-search="">
+                        <option value="">全部批次</option>
+                        <option th:each="b : ${batchNos}" th:value="${b}" th:text="${b}"></option>
+                    </select>
+                </div>
+                <label class="layui-form-label">点位代号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="siteNo" class="layui-input">
+                </div>
+                <label class="layui-form-label">异常类</label>
+                <div class="layui-input-inline" style="width: 140px;">
+                    <select name="issueType">
+                        <option value="">全部</option>
+                        <option value="INVALID">读数越界</option>
+                        <option value="NO_RULE">无可用标准</option>
+                        <option value="RULE_MISMATCH">规则代号对不上</option>
+                        <option value="INVALID_FLAG">申报无效</option>
+                    </select>
+                </div>
+                <label class="layui-form-label">确认</label>
+                <div class="layui-input-inline" style="width: 100px;">
+                    <select name="confirmStatus">
+                        <option value="">全部</option>
+                        <option value="0">待确认</option>
+                        <option value="1">已确认</option>
+                    </select>
+                </div>
+                <label class="layui-form-label">归档</label>
+                <div class="layui-input-inline" style="width: 100px;">
+                    <select name="archived">
+                        <option value="">全部</option>
+                        <option value="1">已归档</option>
+                        <option value="0">未归档</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="issue-query">
+                    <i class="layui-icon layui-icon-search"></i> 查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="issue-table" lay-filter="issue-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="issue-type">
+    {{#  if(d.issueType == 'INVALID'){ }}读数越界
+    {{#  } else if(d.issueType == 'NO_RULE'){ }}无可用标准
+    {{#  } else if(d.issueType == 'RULE_MISMATCH'){ }}规则代号对不上
+    {{#  } else if(d.issueType == 'INVALID_FLAG'){ }}申报无效
+    {{#  } else { }}{{ d.issueType }}{{#  } }}
+</script>
+<script type="text/html" id="issue-confirm">
+    {{#  if(d.confirmStatus == 1){ }}<span class="layui-badge layui-bg-blue">已确认 {{ d.confirmBy }}</span>
+    {{#  } else { }}<span class="layui-badge layui-bg-orange">待确认</span>{{#  } }}
+</script>
+<script type="text/html" id="issue-verify">
+    {{#  if(d.verifyResult == 1){ }}<span class="layui-badge layui-bg-green">核实成</span>
+    {{#  } else if(d.verifyResult == 2){ }}<span class="layui-badge layui-bg-red">核实不成</span>
+    {{#  } else { }}<span class="layui-badge">未核实</span>{{#  } }}
+</script>
+<script type="text/html" id="issue-archived">
+    {{#  if(d.archived == 1){ }}<span class="layui-badge layui-bg-gray">已归档·只读</span>
+    {{#  } else { }}未归档{{#  } }}
+</script>
+<script type="text/html" id="issue-bar">
+    <a class="pear-btn pear-btn-normal pear-btn-sm" lay-event="detail">
+        <i class="layui-icon layui-icon-about"></i> 核实下钻
+    </a>
+    {{#  if(d.confirmStatus != 1 && d.archived != 1){ }}
+    <button class="pear-btn pear-btn-warming pear-btn-sm" lay-event="confirm"
+            shiro:hasPermission="zw:zwIssue:confirm">当面确认</button>
+    {{#  } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery', 'layer'], function () {
+        let table = layui.table, form = layui.form, $ = layui.jquery, layer = layui.layer;
+        let MODULE_PATH = rootPath + "/zwIssue/";
+
+        table.render({
+            elem: '#issue-table', url: MODULE_PATH + 'list', page: true, method: 'get', skin: 'line',
+            cols: [[
+                {title: 'ID', field: 'id', hide: true},
+                {title: '异常事项号', field: 'issueNo', width: 150, align: 'center'},
+                {title: '批次', field: 'batchNo', width: 110, align: 'center'},
+                {title: '行次', field: 'rowNo', width: 60, align: 'center'},
+                {title: '点位', field: 'siteNo', width: 90, align: 'center'},
+                {title: '项目', field: 'itemCode', width: 70, align: 'center'},
+                {title: '读数', field: 'qty', width: 80, align: 'center'},
+                {title: '检测时间', field: 'testAt', width: 165, align: 'center'},
+                {title: '异常类', field: 'issueType', width: 130, align: 'center', templet: '#issue-type'},
+                {title: '确认', field: 'confirmStatus', width: 170, align: 'center', templet: '#issue-confirm'},
+                {title: '核实结论', field: 'verifyResult', width: 100, align: 'center', templet: '#issue-verify'},
+                {title: '核实人', field: 'verifyBy', width: 100, align: 'center'},
+                {title: '核实时间', field: 'verifyTime', width: 165, align: 'center'},
+                {title: '归档', field: 'archived', width: 110, align: 'center', templet: '#issue-archived'},
+                {title: '操作', toolbar: '#issue-bar', width: 200, fixed: 'right', align: 'center'}
+            ]]
+        });
+
+        form.on('submit(issue-query)', function (data) {
+            table.reload('issue-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+
+        table.on('tool(issue-table)', function (obj) {
+            if (obj.event === 'detail') {
+                layer.open({
+                    type: 2, title: '异常核实下钻 ' + obj.data.issueNo, area: ['980px', '720px'],
+                    content: MODULE_PATH + 'detail/' + obj.data.id
+                });
+            } else if (obj.event === 'confirm') {
+                $.post(MODULE_PATH + 'confirm', {id: obj.data.id}, function (res) {
+                    if (res.code === 200) { layer.msg('已当面确认', {icon: 1}); table.reload('issue-table'); }
+                    else { layer.msg(res.msg || '未生效', {icon: 2}); }
+                });
+            }
+        });
+    });
+</script>
+</body>
+</html>

@@ -41,6 +41,12 @@ public interface ITZwLimRuleService {
     WaterVerdict evaluate(String ruleCode, BigDecimal input, Date at, boolean forReview);
 
     /**
+     * 异常核实并排看条文：凭编号 + 检测当天调出那条线的完整条文（让位行也放行），
+     * 供「原始行 / 规则条文 / 复核结论」并排展示；查无此编号上下文返回 null。
+     */
+    TZwLimRule findForReview(String ruleCode, Date at);
+
+    /**
      * 老方法维持原样：按 ruleCode 在 at 时刻现行生效的版本判档（1..4）。
      * 无生效版本 / 输入越界 / 参数缺失一律返回 0。
      */

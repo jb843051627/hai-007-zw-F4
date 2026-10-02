@@ -95,6 +95,15 @@ public class TZwLimRuleServiceImpl implements ITZwLimRuleService {
     }
 
     @Override
+    public TZwLimRule findForReview(String ruleCode, Date at) {
+        if (ruleCode == null || ruleCode.trim().isEmpty() || at == null) {
+            return null;
+        }
+        // 与历史复核评价同一条取线路径：让位行也放行
+        return findRule(ruleCode, at, true);
+    }
+
+    @Override
     public int evaluate(String ruleCode, java.math.BigDecimal input, Date at) {
         // 老方法维持原样（按代号翻线、只认现行版本、判不了给 0）；定级口径与唯一出口同走 WaterGrade
         WaterVerdict v = evaluate(ruleCode, input, at, false);

@@ -68,6 +68,16 @@ public class TZwImpRow implements Serializable {
     @ApiModelProperty(value = "检测发生那天")
     private Date testAt;
 
+    /** 申报是否有效 0否 1是（随原始行入账，列表/导出同一筛选口径） */
+    @TableField("valid_flag")
+    @ApiModelProperty(value = "申报是否有效 0否 1是")
+    private Integer validFlag;
+
+    /** 申报是否已复核 0否 1是（随原始行入账，列表/导出同一筛选口径） */
+    @TableField("review_flag")
+    @ApiModelProperty(value = "申报是否已复核 0否 1是")
+    private Integer reviewFlag;
+
     /** 评价等级 1合格 2关注 3超标 4严重超标；空=未定级（无可用标准） */
     @TableField("grade_level")
     @ApiModelProperty(value = "评价等级 1合格 2关注 3超标 4严重超标")
@@ -83,6 +93,16 @@ public class TZwImpRow implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     @ApiModelProperty(value = "所依标准的生效那天")
     private Date ruleEffDate;
+
+    /** 原始行原样留档（七列原样拼接，下钻先看这一条） */
+    @TableField("raw_line")
+    @ApiModelProperty(value = "原始行原样留档")
+    private String rawLine;
+
+    /** 本行校验结论文面（异常细账在 t_zw_issue，以明细为准） */
+    @TableField("imp_issue_msg")
+    @ApiModelProperty(value = "本行校验结论文面")
+    private String impIssueMsg;
 
     /** 行落地情形 0待核 1已入库 2退回 */
     @TableField("status")
@@ -185,6 +205,22 @@ public class TZwImpRow implements Serializable {
         this.testAt = testAt;
     }
 
+    public Integer getValidFlag() {
+        return validFlag;
+    }
+
+    public void setValidFlag(Integer validFlag) {
+        this.validFlag = validFlag;
+    }
+
+    public Integer getReviewFlag() {
+        return reviewFlag;
+    }
+
+    public void setReviewFlag(Integer reviewFlag) {
+        this.reviewFlag = reviewFlag;
+    }
+
     public Integer getGradeLevel() {
         return gradeLevel;
     }
@@ -207,6 +243,22 @@ public class TZwImpRow implements Serializable {
 
     public void setRuleEffDate(Date ruleEffDate) {
         this.ruleEffDate = ruleEffDate;
+    }
+
+    public String getRawLine() {
+        return rawLine;
+    }
+
+    public void setRawLine(String rawLine) {
+        this.rawLine = rawLine;
+    }
+
+    public String getImpIssueMsg() {
+        return impIssueMsg;
+    }
+
+    public void setImpIssueMsg(String impIssueMsg) {
+        this.impIssueMsg = impIssueMsg;
     }
 
     public Integer getStatus() {

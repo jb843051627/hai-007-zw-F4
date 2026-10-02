@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('化验读数导入与检测明细')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" enctype="multipart/form-data" id="imp-upload-form">
+            <div class="layui-form-item">
+                <label class="layui-form-label">采样批次</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="batchNo" placeholder="如 B202610，可留空按表内号" class="layui-input">
+                </div>
+                <label class="layui-form-label">当月 Excel</label>
+                <div class="layui-input-inline" style="width: 280px;">
+                    <input type="file" name="file" accept=".xlsx" class="layui-input" id="imp-file">
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" type="button" id="imp-upload-btn"
+                        shiro:hasPermission="zw:zwImpData:import">
+                    <i class="layui-icon layui-icon-upload"></i>
+                    校验并导入
+                </button>
+                <a class="pear-btn pear-btn-md" th:href="@{/zwImpData/template}"
+                   shiro:hasPermission="zw:zwImpData:import">
+                    <i class="layui-icon layui-icon-download-circle"></i>
+                    下载导入模板
+                </a>
+            </div>
+            <div class="layui-form-item layui-word-aux" style="margin-left: 110px;">
+                七列：采样批次、读数明细（项目|样本类别|读数）、规则代号、点位编号、检测时间(yyyy-MM-dd HH:mm:ss)、是否有效、是否已复核。
+                点位/批次月份/时间格式对不上会整批拦下，一笔不落；读数异常的行进「水质异常核实台账」。
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">采样批次</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="batchNo" class="layui-input">
+                </div>
+                <label class="layui-form-label">点位代号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="siteNo" class="layui-input">
+                </div>
+                <label class="layui-form-label">是否有效</label>
+                <div class="layui-input-inline" style="width: 100px;">
+                    <select name="validFlag">
+                        <option value="">全部</option>
+                        <option value="1">是</option>
+                        <option value="0">否</option>
+                    </select>
+                </div>
+                <label class="layui-form-label">是否已复核</label>
+                <div class="layui-input-inline" style="width: 100px;">
+                    <select name="reviewFlag">
+                        <option value="">全部</option>
+                        <option value="1">是</option>
+                        <option value="0">否</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="imp-query">
+                    <i class="layui-icon layui-icon-search"></i> 查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i> 重置
+                </button>
+                <button type="button" class="pear-btn pear-btn-md pear-btn-success" id="imp-report-btn"
+                        shiro:hasPermission="zw:zwImpData:export">
+                    <i class="layui-icon layui-icon-export"></i> 导出明细报表(UTF-8 Excel)
+                </button>
+                <a class="pear-btn pear-btn-md" th:href="@{/zwIssue/view}"
+                   shiro:hasPermission="zw:zwIssue:view">
+                    <i class="layui-icon layui-icon-about"></i> 异常核实台账
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="imp-table" lay-filter="imp-table"></table>
+    </div>
+</div>
+
+<script type="text/html" id="imp-grade">
+    {{#  if(d.gradeLevel == 1){ }}<span class="layui-badge layui-bg-green">合格</span>
+    {{#  } else if(d.gradeLevel == 2){ }}<span class="layui-badge layui-bg-blue">关注</span>
+    {{#  } else if(d.gradeLevel == 3){ }}<span class="layui-badge layui-bg-orange">超标</span>
+    {{#  } else if(d.gradeLevel == 4){ }}<span class="layui-badge layui-bg-red">严重超标</span>
+    {{#  } else { }}<span class="layui-badge">未定级</span>{{#  } }}
+</script>
+<script type="text/html" id="imp-yesno">
+    {{#  if(d.validFlag == 1){ }}是{{#  } else { }}<span class="layui-badge">否</span>{{#  } }}
+</script>
+<script type="text/html" id="imp-review">
+    {{#  if(d.reviewFlag == 1){ }}是{{#  } else { }}否{{#  } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery', 'layer', 'upload', 'util'], function () {
+        let table = layui.table, form = layui.form, $ = layui.jquery, layer = layui.layer,
+            util = layui.util;
+        let MODULE_PATH = rootPath + "/zwImpData/";
+
+        let cols = [[
+            {title: 'ID', field: 'id', hide: true},
+            {title: '采样批次', field: 'batchNo', width: 120, align: 'center'},
+            {title: '行次', field: 'rowNo', width: 70, align: 'center'},
+            {title: '点位代号', field: 'siteNo', width: 100, align: 'center'},
+            {title: '项目', field: 'itemCode', width: 80, align: 'center'},
+            {title: '样本类别', field: 'sampleType', width: 110, align: 'center'},
+            {title: '读数', field: 'qty', width: 90, align: 'center'},
+            {title: '检测时间', field: 'testAt', width: 170, align: 'center'},
+            {title: '有效', field: 'validFlag', width: 80, align: 'center', templet: '#imp-yesno'},
+            {title: '已复核', field: 'reviewFlag', width: 90, align: 'center', templet: '#imp-review'},
+            {title: '等级', field: 'gradeLevel', width: 100, align: 'center', templet: '#imp-grade'},
+            {title: '规则代号', field: 'ruleCode', width: 130, align: 'center'},
+            {title: '规则生效日', field: 'ruleEffDate', width: 170, align: 'center'},
+            {title: '校验结论', field: 'impIssueMsg', minWidth: 220}
+        ]];
+        table.render({
+            elem: '#imp-table', url: MODULE_PATH + 'list', page: true, method: 'get',
+            cols: cols, skin: 'line', defaultToolbar: ['filter']
+        });
+
+        // 校验并导入：用 FormData 直接 POST，结果按 rejected/正常两种当场交代
+        $('#imp-upload-btn').on('click', function () {
+            let f = $('#imp-file')[0].files[0];
+            if (!f) { layer.msg('请先选择 xlsx 文件', {icon: 2}); return; }
+            let fd = new FormData($('#imp-upload-form')[0]);
+            let load = layer.load(2);
+            $.ajax({
+                url: MODULE_PATH + 'upload', type: 'post', data: fd,
+                processData: false, contentType: false,
+                success: function (res) {
+                    layer.close(load);
+                    if (res.code === 200) {
+                        let d = res.data || {};
+                        layer.alert('批次 ' + (d.batchNo || '') + ' 导入完成：正式落账 ' + d.landed
+                            + ' 行，登记异常 ' + d.issues + ' 行，跳过(已落账/已核实) ' + d.skipped + ' 行。',
+                            {icon: 1, title: '导入结果'}, function (idx) {
+                                layer.close(idx);
+                                table.reload('imp-table', {page: {curr: 1}});
+                            });
+                    } else {
+                        // 整批拦下：逐行列明第几行为什么，不允许悄悄入库
+                        let d = res.data || {};
+                        let lines = ['整批未通过校验，一笔未落库：'];
+                        (d.errors || []).forEach(function (e) {
+                            lines.push('第 ' + e.rowNo + ' 行：' + e.reason);
+                        });
+                        layer.open({
+                            type: 1, title: '整批拦截原因', area: ['640px', '420px'],
+                            content: '<div style="padding:16px;overflow:auto;height:100%;line-height:1.9;">'
+                                + lines.map(function (s) { return util.escape(s); }).join('<br>') + '</div>'
+                        });
+                    }
+                },
+                error: function () { layer.close(load); layer.msg('上传失败，请重试', {icon: 2}); }
+            });
+        });
+
+        // 报表导出：把当前筛选条件与统计日期带上，浏览器直接下载，本机不装 Office
+        $('#imp-report-btn').on('click', function () {
+            let field = {};
+            $('.layui-card:eq(1) form').serializeArray().forEach(function (p) { field[p.name] = p.value; });
+            let stat = util.toDateString(Date.now(), 'yyyy-MM-dd');
+            let qs = $.param({
+                siteNo: field.siteNo || '', validFlag: field.validFlag || '',
+                reviewFlag: field.reviewFlag || '', statDate: stat
+            });
+            window.location.href = MODULE_PATH + 'report?' + qs;
+        });
+
+        form.on('submit(imp-query)', function (data) {
+            table.reload('imp-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+    });
+</script>
+</body>
+</html>

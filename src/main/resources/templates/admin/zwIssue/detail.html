@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('异常核实下钻')"/>
+    <style>
+        .side-box {border:1px solid #e2e2e2;border-radius:6px;padding:12px 14px;background:#fff;height:100%;}
+        .side-box h3 {font-size:15px;margin:0 0 10px 0;padding-bottom:8px;border-bottom:1px solid #f0f0f0;}
+        .kv-line {font-size:13px;color:#555;line-height:2;}
+        .kv-line b {color:#222;}
+        .raw-line {background:#fafafa;border:1px dashed #d0d0d0;border-radius:4px;padding:10px;font-size:13px;
+                   word-break:break-all;line-height:1.8;}
+        .locked-mask {background:#f4f4f4;color:#888;border:1px dashed #c1c1c1;border-radius:6px;
+                      padding:10px 14px;margin-top:10px;}
+        .rule-table td {padding:3px 8px;font-size:13px;border-bottom:1px dotted #eee;vertical-align:top;}
+        .rule-table td:first-child {color:#888;width:110px;white-space:nowrap;}
+    </style>
+</head>
+<body class="pear-container" style="padding:12px;">
+<th:block th:if="${view == null}">
+    <div class="locked-mask">异常不存在或已删除。</div>
+</th:block>
+<th:block th:if="${view != null}" th:with="i=${view.issue}">
+    <div class="layui-card">
+        <div class="layui-card-header" style="font-weight:600;">
+            <span th:text="${i.issueNo}"></span>
+            <span class="layui-badge layui-bg-orange" th:if="${i.confirmStatus != 1}">待确认</span>
+            <span class="layui-badge layui-bg-blue" th:if="${i.confirmStatus == 1}">已确认</span>
+            <span class="layui-badge layui-bg-green" th:if="${i.verifyResult == 1}">核实成</span>
+            <span class="layui-badge layui-bg-red" th:if="${i.verifyResult == 2}">核实不成</span>
+            <span class="layui-badge layui-bg-gray" th:if="${i.archived == 1}">已归档·原样锁定</span>
+            <span style="font-weight:normal;color:#999;font-size:12px;margin-left:10px;">
+                批次 <span th:text="${i.batchNo}"></span>，第 <span th:text="${i.rowNo}"></span> 行；
+                本批 <span th:text="${view.batchConfirmed}"></span>/<span th:text="${view.batchTotal}"></span> 已确认
+            </span>
+        </div>
+        <div class="layui-card-body">
+            <div class="layui-row layui-col-space12">
+                <!-- 左：原始行 -->
+                <div class="layui-col-md4">
+                    <div class="side-box">
+                        <h3>① 原始行（归档锁住的就是它）</h3>
+                        <div class="raw-line" th:text="${i.rawLine}"></div>
+                        <div class="kv-line" style="margin-top:10px;">
+                            点位代号：<b th:text="${i.siteNo}"></b><br>
+                            项目/类别/读数：<b th:text="${i.itemCode} + ' / ' + ${i.sampleType} + ' / ' + ${i.qty}"></b><br>
+                            <!-- 时间：页面与接口同一把尺 yyyy-MM-dd HH:mm:ss -->
+                            检测时间：<b th:text="${i.testAt != null ? #dates.format(i.testAt,'yyyy-MM-dd HH:mm:ss') : ''}"></b><br>
+                            申报有效：<b th:text="${i.validFlag == 1 ? '是' : '否'}"></b>
+                            ｜申报已复核：<b th:text="${i.reviewFlag == 1 ? '是' : '否'}"></b><br>
+                            申报规则代号：<b th:text="${i.ruleCodeDecl ?: '（未填）'}"></b>
+                        </div>
+                    </div>
+                </div>
+                <!-- 中：规则条文 -->
+                <div class="layui-col-md4">
+                    <div class="side-box">
+                        <h3>② 规则条文（按检测当天调出，不用今天的线改算）</h3>
+                        <div class="kv-line">申报代号对应的线：</div>
+                        <table class="rule-table" th:if="${view.declaredRule != null}">
+                            <tr><td>代号/名称</td><td th:text="${view.declaredRule.ruleCode + ' ' + view.declaredRule.ruleName}"></td></tr>
+                            <tr><td>类别</td><td th:text="${view.declaredRule.sampleType}"></td></tr>
+                            <tr><td>关注/超标/严重上限</td>
+                                <td th:text="${view.declaredRule.th1Max + ' / ' + view.declaredRule.th2Max + ' / ' + (view.declaredRule.th3Max ?: '不设')}"></td></tr>
+                            <tr><td>生效窗口</td>
+                                <td th:text="${#dates.format(view.declaredRule.effStart,'yyyy-MM-dd')}
+                                    + ' ～ ' + ${view.declaredRule.effEnd != null ? #dates.format(view.declaredRule.effEnd,'yyyy-MM-dd') : '长期'}"></td></tr>
+                        </table>
+                        <div class="locked-mask" th:if="${view.declaredRule == null}">
+                            底档查无该申报代号在检测当天的上下文。
+                        </div>
+                        <div class="kv-line" style="margin-top:10px;">裁决出口当天选中的线：</div>
+                        <table class="rule-table" th:if="${view.hitRule != null}">
+                            <tr><td>代号/名称</td><td th:text="${view.hitRule.ruleCode + ' ' + view.hitRule.ruleName}"></td></tr>
+                            <tr><td>类别</td><td th:text="${view.hitRule.sampleType}"></td></tr>
+                            <tr><td>关注/超标/严重上限</td>
+                                <td th:text="${view.hitRule.th1Max + ' / ' + view.hitRule.th2Max + ' / ' + (view.hitRule.th3Max ?: '不设')}"></td></tr>
+                            <tr><td>裁决等级</td><td>
+                                <b th:if="${i.gradeLevel != null}"
+                                   th:text="${i.gradeLevel == 1 ? '合格' : (i.gradeLevel == 2 ? '关注' : (i.gradeLevel == 3 ? '超标' : '严重超标'))}"></b>
+                                <span th:if="${i.gradeLevel == null}">未定级（越界/无可用标准）</span>
+                            </td></tr>
+                        </table>
+                        <div class="locked-mask" th:if="${view.hitRule == null}">
+                            该异常没有裁决命中线（读数越界或检测当天无可用标准）。
+                        </div>
+                    </div>
+                </div>
+                <!-- 右：复核结论 -->
+                <div class="layui-col-md4">
+                    <div class="side-box">
+                        <h3>③ 复核结论（只写一次，以核实那一次为准）</h3>
+                        <div class="kv-line">
+                            导入校验结论：<b th:text="${i.checkResult}"></b><br><br>
+                            <th:block th:if="${i.verifyResult != null}">
+                                核实结论：<b th:text="${i.verifyResult == 1 ? '核实成' : '核实不成'}"></b><br>
+                                原因/说明：<b th:text="${i.verifyReason ?: '（未填）'}"></b><br>
+                                核实人：<b th:text="${i.verifyBy}"></b><br>
+                                核实时间：<b th:text="${#dates.format(i.verifyTime,'yyyy-MM-dd HH:mm:ss')}"></b>
+                            </th:block>
+                            <span th:if="${i.verifyResult == null}">尚未核实——整批一次核实后写入，随即归档。</span>
+                        </div>
+                        <div class="locked-mask" th:if="${i.archived == 1}">
+                            已归档：原始行、结论、核实人、核实时间原样锁住，谁都只能只读查看，
+                            同批重新导入也不会翻出本条重复核。
+                        </div>
+                        <div th:if="${i.archived != 1}" style="margin-top:12px;">
+                            <button class="pear-btn pear-btn-warming pear-btn-sm" id="btn-confirm-batch"
+                                    shiro:hasPermission="zw:zwIssue:confirm">整批当面确认</button>
+                            <button class="pear-btn pear-btn-success pear-btn-sm" id="btn-verify-pass"
+                                    shiro:hasPermission="zw:zwIssue:verify">整批核实成</button>
+                            <button class="pear-btn pear-btn-danger pear-btn-sm" id="btn-verify-fail"
+                                    shiro:hasPermission="zw:zwIssue:verify">整批核实不成</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 本期与上期：按同一批次口径逐行比原始行 -->
+    <div class="layui-card">
+        <div class="layui-card-header" style="font-weight:600;">本期与上期差异（同一行次口径，比对的是明细原始行）</div>
+        <div class="layui-card-body">
+            <form class="layui-form">
+                <div class="layui-form-item">
+                    <label class="layui-form-label">本期批次</label>
+                    <div class="layui-input-inline">
+                        <input type="text" id="diff-cur" class="layui-input" th:value="${i.batchNo}">
+                    </div>
+                    <label class="layui-form-label">上期批次</label>
+                    <div class="layui-input-inline">
+                        <input type="text" id="diff-prev" class="layui-input">
+                    </div>
+                    <button type="button" class="pear-btn pear-btn-primary pear-btn-sm" id="btn-diff">比对</button>
+                </div>
+            </form>
+            <table class="layui-table" id="diff-table" style="display:none;">
+                <thead><tr><th style="width:80px;">行次</th><th style="width:130px;">差异</th>
+                    <th>本期原始行</th><th>上期原始行</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</th:block>
+
+<th:block th:include="include :: footer"/>
+<script th:if="${view != null}" th:inline="javascript">
+    layui.use(['jquery', 'layer', 'util'], function () {
+        let $ = layui.jquery, layer = layui.layer, util = layui.util;
+        let MODULE_PATH = rootPath + "/zwIssue/";
+        let batchNo = [[${view.issue.batchNo}]];
+        let archived = [[${view.issue.archived}]] === 1;
+
+        function reloadAll() {
+            if (window.parent && window.parent.layui) {
+                try { window.parent.layui.table.reload('issue-table'); } catch (e) {}
+            }
+            location.reload();
+        }
+
+        $('#btn-confirm-batch').on('click', function () {
+            $.post(MODULE_PATH + 'confirmBatch', {batchNo: batchNo}, function (res) {
+                if (res.code === 200) { layer.msg('整批确认完成', {icon: 1}); reloadAll(); }
+                else { layer.msg(res.msg || '未生效', {icon: 2}); }
+            });
+        });
+
+        function verify(result) {
+            layer.prompt({
+                title: result === 1 ? '整批核实成——补充说明（可空）' : '整批核实不成——必须写明原因',
+                formType: 2
+            }, function (reason, idx) {
+                $.post(MODULE_PATH + 'verify',
+                    {batchNo: batchNo, result: result, reason: reason}, function (res) {
+                        if (res.code === 200) {
+                            layer.close(idx);
+                            layer.msg('整批已核实归档，共 ' + res.data + ' 条', {icon: 1}, reloadAll);
+                        } else {
+                            layer.msg(res.msg || '核实未生效', {icon: 2});
+                        }
+                    });
+            });
+        }
+        $('#btn-verify-pass').on('click', function () { verify(1); });
+        $('#btn-verify-fail').on('click', function () { verify(2); });
+
+        $('#btn-diff').on('click', function () {
+            let cur = $('#diff-cur').val(), prev = $('#diff-prev').val();
+            if (!cur || !prev) { layer.msg('请填齐两个批次', {icon: 2}); return; }
+            $.get(MODULE_PATH + 'diff', {currentBatch: cur, previousBatch: prev}, function (res) {
+                if (res.code !== 200) { layer.msg(res.msg || '比对失败', {icon: 2}); return; }
+                let $tb = $('#diff-table tbody').empty();
+                if (!res.data.length) {
+                    $tb.append('<tr><td colspan="4" style="text-align:center;color:#16b777;">两批同口径完全一致，无差异。</td></tr>');
+                }
+                res.data.forEach(function (d) {
+                    $tb.append('<tr><td>' + d.rowNo + '</td><td>' + util.escape(d.kindText)
+                        + '</td><td>' + util.escape(d.rawLineCurrent || '（无）')
+                        + '</td><td>' + util.escape(d.rawLinePrevious || '（无）') + '</td></tr>');
+                });
+                $('#diff-table').show();
+            });
+        });
+    });
+</script>
+</body>
+</html>
